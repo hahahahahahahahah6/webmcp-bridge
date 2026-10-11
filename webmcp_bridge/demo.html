@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>webmcp-bridge demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2em auto; padding: 0 1em; }
+  button { padding: .5em 1em; margin-right: .5em; }
+  #out { white-space: pre-wrap; border: 1px solid #ccc; padding: 1em; margin-top: 1em; min-height: 6em; }
+  input { width: 100%; padding: .4em; margin: .5em 0; }
+</style>
+</head>
+<body>
+<h1>webmcp-bridge demo</h1>
+<p>
+  This page registers Browser Buddy's tools with the WebMCP API
+  (<code>document.modelContext</code>, falling back to
+  <code>navigator.modelContext</code>). Calls run through the local bridge
+  server into your <b>real, logged-in Chrome profile</b>.
+</p>
+<p>Status: <span id="status">checking WebMCP support...</span></p>
+<button id="list">List tools</button>
+<button id="read">Call read_active_tab</button>
+<input id="url" type="text" placeholder="https://example.com (for open_and_read_url)">
+<button id="open">Call open_and_read_url</button>
+<div id="out"></div>
+<script src="/webmcp.js"></script>
+<script>
+(function () {
+  var out = document.getElementById("out");
+  var status = document.getElementById("status");
+  function say(t) { out.textContent = t; }
+  var mc = (document.modelContext && document.modelContext.registerTool)
+    ? "document.modelContext"
+    : ((navigator.modelContext && navigator.modelContext.registerTool)
+      ? "navigator.modelContext" : null);
+  status.textContent = mc ? ("WebMCP detected via " + mc) : "No WebMCP API found";
+  document.getElementById("list").onclick = function () {
+    fetch("/webmcp/tools").then(function (r) { return r.json(); })
+      .then(function (d) {
+        say(d.tools.map(function (t) { return t.name + " - " + t.title; }).join("\n"));
+      })
+      .catch(function (e) { say("error: " + e.message); });
+  };
+  document.getElementById("read").onclick = function () {
+    fetch("/webmcp/tools/call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "read_active_tab", arguments: {} })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) { say((d.content || []).map(function (b) { return b.text; }).join("\n")); })
+      .catch(function (e) { say("error: " + e.message); });
+  };
+  document.getElementById("open").onclick = function () {
+    var url = document.getElementById("url").value;
+    fetch("/webmcp/tools/call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "open_and_read_url", arguments: { url: url } })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) { say((d.content || []).map(function (b) { return b.text; }).join("\n")); })
+      .catch(function (e) { say("error: " + e.message); });
+  };
+})();
+</script>
+</body>
+</html>
